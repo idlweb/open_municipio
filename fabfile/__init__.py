@@ -160,7 +160,8 @@ def deploy():
             if run('test -d %(domain_root)s' % env).failed:
                 abort("It seems that the root dir for this OpenMunicipio instance has not been created, yet.") 
         with settings(warn_only=True):
-            execute(webserver.stop)
+#            execute(webserver.stop)
+            execute(nginx.stop)
         # update Django project's files
         execute(code.update_project)
         # update external dependencies
@@ -179,10 +180,13 @@ def deploy():
         # collect static files
         execute(static.collect_files)
         # clear webserver's log when deploying to the staging server
-        if env.environment == 'staging': execute(webserver.clear_logs)
+#        if env.environment == 'staging': execute(webserver.clear_logs)
+        if env.environment == 'staging': execute(nginx.clear_logs)
         # update webserver configuration
-        execute(webserver.update_conf)
-        execute(webserver.start)
+#        execute(webserver.update_conf)
+        execute(nginx.update_conf)
+#        execute(webserver.start)
+        execute(nginx.start)
         # adjust filesystem permissions
         execute(adjust_permissions)
 
