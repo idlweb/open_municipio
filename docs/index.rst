@@ -8,6 +8,7 @@ Contents:
    
    dev/install
    dev/solr_haystack
+   dev/deploy
    dev/GUIDELINES
    dev/code/queries
    dev/code/apps/testdatabuilder

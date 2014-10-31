@@ -2,8 +2,8 @@ from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
 
 from .models import Attendance, ChargeAttendance
-from open_senigallia.votations.filters import VotationIsLinkedToAct, \
-                            VotationByYearFilterSpec, VotationByMonthFilterSpec
+#from open_senigallia.votations.filters import VotationIsLinkedToAct, \
+#                            VotationByYearFilterSpec, VotationByMonthFilterSpec
 
 class ChargeAttendanceInline(admin.TabularInline):
     
@@ -16,8 +16,8 @@ class ChargeAttendanceInline(admin.TabularInline):
 class AttendanceAdmin(admin.ModelAdmin):
     
     search_fields = ('act_descr', 'idnum', 'act__title', 'act__adj_title',)
-    list_filter = (VotationIsLinkedToAct, VotationByYearFilterSpec,
-                    VotationByMonthFilterSpec,) 
+#    list_filter = (VotationIsLinkedToAct, VotationByYearFilterSpec,
+#                    VotationByMonthFilterSpec,) 
     raw_id_fields = ['act','sitting',]
     ordering = ['sitting__date',]
     list_display = ['idnum', 'act_descr', 'sitting', 'is_linked_col','n_presents', 'n_absents', ]

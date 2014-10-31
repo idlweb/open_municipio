@@ -18,7 +18,9 @@
 
 import os
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+# root directory for application-specific files (on the server machine)
+DOMAIN_ROOT = os.path.abspath(os.path.dirname(os.path.dirname((os.path.dirname(__file__)))))
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__))
 REPO_ROOT = os.path.abspath(os.path.dirname(PROJECT_ROOT))
 VERSION = __version__ = file(os.path.join(PROJECT_ROOT, 'VERSION')).read().strip()
 
@@ -253,7 +255,8 @@ LOGGING = {
         'logfile': {
             'level':'INFO',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': REPO_ROOT + "/log/logfile",
+#            'filename': REPO_ROOT + "/log/logfile",
+            'filename': os.path.join(DOMAIN_ROOT, 'log', 'logfile'),
             'maxBytes': 50000,
             'backupCount': 2,
             'formatter': 'standard',
@@ -265,7 +268,8 @@ LOGGING = {
         'webapp': {
             'level':'DEBUG',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': REPO_ROOT + "/log/webapp.log",
+#            'filename': REPO_ROOT + "/log/webapp.log",
+            'filename': os.path.join(DOMAIN_ROOT, 'log', 'webapp.log'),
             'maxBytes': 50000,
             'backupCount': 5,
             'formatter': 'standard',
@@ -300,7 +304,8 @@ AJAX_SELECT_INLINES = 'inline'
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/home/media/media.lawrence.com/"
-MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media')
+#MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media')
+MEDIA_ROOT = os.path.join(DOMAIN_ROOT, 'public','media')
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash if there is a path component (optional in other cases).
@@ -311,7 +316,8 @@ MEDIA_URL = '/media/'
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/home/media/media.lawrence.com/static/"
-STATIC_ROOT = os.path.join(PROJECT_ROOT, 'sitestatic')
+#STATIC_ROOT = os.path.join(PROJECT_ROOT, 'sitestatic')
+STATIC_ROOT = os.path.join(DOMAIN_ROOT, 'public', 'static')
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
@@ -371,3 +377,8 @@ OP_URL_TEMPLATE = "http://politici.openpolis.it/politico/%(op_id)s"
 NL_TITLE = "Monitoraggio Open Municipio"
 NL_FROM = "Open Municipio <noreply@openmunicipio.it>"
 
+
+# fix with values that do not show anything
+ALERT_POPUP = False
+ALERT_BAR = False
+ALERT_NAVBAR = False
