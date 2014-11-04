@@ -216,12 +216,12 @@ OM_BOOKMARKING_EMPTY_STAR_CLASS = 'icon-star-empty'
 
 # Site templates globals variables
 SITE_INFO = {
-    'main_city': u'City',
+    'main_city': u'Ordine degli Psicologi - Puglia',
     'site_version': u'Beta',
     'main_city_logo': 'img/city-logo/city-logo.png',
-    'main_city_website': 'http://www.maincity.it', 
+    'main_city_website': 'http://www.psicologipuglia.it', 
 }
-DEFAULT_FROM_EMAIL = "info@openmunicipio.it"
+DEFAULT_FROM_EMAIL = "Ordine degli Psicologi <noreply@psicologipuglia.it>"
 DIGEST_DEFAULT_GROUP = "redazione"
 
 # Make this unique, and don't share it with anybody.
@@ -379,6 +379,6 @@ NL_FROM = "Open Municipio <noreply@openmunicipio.it>"
 
 
 # fix with values that do not show anything
-ALERT_POPUP = False
-ALERT_BAR = False
-ALERT_NAVBAR = False
+ALERT_POPUP = ""
+ALERT_BAR = ""
+ALERT_NAVBAR = ""
