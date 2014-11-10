@@ -119,7 +119,7 @@ def touch_WSGI_script():
     require('domain_root', provided_by=('staging', 'production'))
     fastprint("Triggering code reload..." % env, show_prefix=True)
     with hide('stdout', 'running'):
-        apache_dir = os.path.join(env.domain_root, 'private', 'apache')
+        apache_dir = os.path.join(env.domain_root, 'private')
         with cd(apache_dir):
             run('touch django.wsgi')
     fastprint(" done." % env, end='\n')

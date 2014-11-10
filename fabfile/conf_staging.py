@@ -17,7 +17,7 @@ RSYNC_EXCLUDE = (
 PROJECT_NAME = 'open_municipio' ## CHANGEME!
 # a unique identifier for this web application instance
 # usually it's set to the primary domain from which the web application is accessed
-APP_DOMAIN = 'www.psicologipuglia.it' ## CHANGEME!
+APP_DOMAIN = 'oo.psicologipuglia.it' ## CHANGEME!
 # filesystem location of project's repository on the local machine
 LOCAL_REPO_ROOT =  os.path.join(os.path.abspath(os.path.dirname(__file__)), '..')
 # filesystem location of Django project's files on the local machine
@@ -29,10 +29,10 @@ WEB_USER = 'oo'
 # to login as ``WEB_USER`` on the remote machine(s)
 WEB_USER_HOSTKEY = '~/.ssh/id_rsa.pub' ## CHANGEME!
 # system user (on the server machine) used for managing this OpenMunicipio's instance
-OM_USER = 'oo' ## CHANGEME!
+OM_USER = WEB_USER 
 # absolute filesystem path to the public SSH key being used 
 # to login as the ``OM_USER`` user on the remote machine(s)
-OM_USER_HOSTKEY = '~/.ssh/id_rsa.pub' ## CHANGEME!
+OM_USER_HOSTKEY = WEB_USER_HOSTKEY 
 ###------------------  Django ------------###
 # the parent directory of domain-specific directories (on the server machine) 
 WEB_ROOT = '/home/oo'
@@ -73,7 +73,7 @@ POSTGRES_CONTROLLER = 'service postgresql'
 # DB username
 DB_USER = OM_USER 
 # name of the application DB
-DB_NAME = OM_USER 
+DB_NAME = PROJECT_NAME
 PROVISION_PACKAGES = ['mercurial',
                       'python-dev',
                       'libxml2', 

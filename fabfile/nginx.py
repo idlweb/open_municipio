@@ -1,4 +1,6 @@
-from fabric.api import cd, env, execute, hide, put, require, roles, run, sudo, task
+from fabric.api import cd, lcd, env, execute, hide, put, require, \
+                        roles, run, sudo, task
+from fabric.contrib.files import exists
 from fabric.utils import fastprint
 
 from venv import run_venv
@@ -56,7 +58,7 @@ def restart():
 
 
 @task
-@roles('om')
+@roles('web')
 def enable_site(site_name):
     """
     Enable a webserver's virtualhost.
@@ -70,7 +72,7 @@ def enable_site(site_name):
   
 
 @task
-@roles('om')
+@roles('web')
 def disable_site(site_name):
     """
     Disable a webserver's virtualhost.
@@ -84,7 +86,7 @@ def disable_site(site_name):
       
 
 @task
-@roles('om')
+@roles('web')
 def upload_conf():
     """
     Upload webserver configuration to the remote host.
@@ -93,11 +95,6 @@ def upload_conf():
     ## upload custom Nginx directives
     fastprint("Uploading vhost configuration for %(app_domain)s..." % env, show_prefix=True)
     with hide('stdout', 'running'):
-#        source = os.path.join(env.local_repo_root, 'apache', 'httpd.conf.%(environment)s' % env)
-#        with cd('/etc/apache2'):
-#            dest = 'httpd.conf'
-#            put(source, dest, use_sudo=True, mode=0644)
-#            sudo('chown root:root %s' % dest)
         ## upload Virtual Host configuration
         source = os.path.join(env.local_repo_root, 'nginx', 'vhost.conf.%(environment)s' % env)
         with cd('/etc/nginx/sites-available'):
@@ -106,9 +103,30 @@ def upload_conf():
             sudo('chown root:root %s' % dest)
     fastprint(" done." % env, end='\n')
     
-    
+
+@task
+@roles('web')
+def update_uwsgi_conf():
+    """
+    Update the uwsgi configuration and start it
+    """
+
+    with lcd(os.path.join(env.local_repo_root, 'nginx')):
+        nginx_dir = os.path.join(env.domain_root, 'private', 'nginx')
+        run('mkdir -p %s' % nginx_dir)
+        with cd(nginx_dir):
+            source = '%(project)s.uwsgi.ini' % env
+            dest = '%(project)s.uwsgi.ini' % env
+            put(source, dest, mode=0644)
+
+            source = dest = 'uwsgi_params'
+            put(source, dest, mode=0644)
+
+    execute(upload_conf_uwsgi)
+    execute(reload_uwsgi)
+   
 @task 
-@roles('om')
+@roles('web')
 def update_conf():
     """
     Update webserver configuration on the remote host.
@@ -118,13 +136,13 @@ def update_conf():
     # start uwsgi
     # reload/start uwsgi
     # 
-    execute(upload_conf_uwsgi)
-    execute(reload_uwsgi)
+#    execute(upload_conf_uwsgi)
+#    execute(reload_uwsgi)
     execute(upload_conf)
     execute(enable_site, site_name=env.app_domain)
 
 @task
-@roles('om')
+@roles('web')
 def touch_WSGI_script():
     """
     Touch WSGI script to trigger code reload.
@@ -132,14 +150,14 @@ def touch_WSGI_script():
     require('domain_root', provided_by=('staging', 'production'))
     fastprint("Triggering code reload..." % env, show_prefix=True)
     with hide('stdout', 'running'):
-        nginx_dir = os.path.join(env.domain_root, 'private', 'nginx')
+        nginx_dir = os.path.join(env.domain_root, 'private')
         with cd(nginx_dir):
             run('touch django.wsgi')
     fastprint(" done." % env, end='\n')
     
     
 @task
-@roles('om')
+@roles('web')
 def clear_logs():
     """
     Clear website-specific logs.
@@ -152,21 +170,27 @@ def clear_logs():
     fastprint(" done." % env, end='\n')
 
 @task
-@roles('om')
+@roles('web')
 def stop_uwsgi():
     """
     Kill the master instance of a running uwsgi process
     """
     require('domain_root', provided_by=('staging', 'production'))
-    fastprint("Killing running instance of uwsgi ..." % env, show_prefix=True)
+    fastprint("Stopping running instance of uwsgi ..." % env, show_prefix=True)
     with hide('stdout','running'):
         with cd(env.domain_root):
-            run_venv('[ -e "./private/nginx/open_municipio.pid" ] && uwsgi --stop ./private/nginx/open_municipio.pid')
+
+            pid_file = "./private/nginx/%(project)s.pid" % env
+
+            if exists(pid_file):
+                run_venv('uwsgi --stop %s' % pid_file)
+
+
     fastprint(" done." % env, end='\n')
 
 
 @task
-@roles('om')
+@roles('web')
 def reload_uwsgi():
     """
     Reload the master instance of a running uwsgi process
@@ -175,12 +199,13 @@ def reload_uwsgi():
     fastprint("Reloading running instance of uwsgi ..." % env, show_prefix=True)
     with hide('stdout','running'):
         with cd(env.domain_root):
-            run_venv('uwsgi --reload ./private/nginx/open_municipio.pid')
+            stop_uwsgi()
+            start_uwsgi()
     fastprint(" done." % env, end='\n')
 
 
 @task
-@roles('om')
+@roles('web')
 def start_uwsgi():
     """
     Start a uwsgi instance for the deployed site
@@ -200,7 +225,7 @@ def start_uwsgi():
 
  
 @task
-@roles('om')
+@roles('web')
 def upload_conf_uwsgi():
     """
     Upload ini file for uwsgi
