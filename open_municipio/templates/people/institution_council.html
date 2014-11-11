@@ -43,10 +43,14 @@
       </tr>
       </thead>
       <tbody>
+      {% if president %}
       {%  include 'people/counselor_table_row.html' with charge=president label="Presidente" id_prefix="0" %}
+      {% endif %}
+      {% if vicepresidents %}
       {% for vp in vicepresidents %}
           {%  include 'people/counselor_table_row.html' with charge=vp.charge label="Vice presidente" id_prefix="1" %}
       {% endfor %}
+      {% endif %}
       {% for charge in council.members %}
           {%  include 'people/counselor_table_row.html' with charge=charge id_prefix="2" %}
       {% endfor %}
