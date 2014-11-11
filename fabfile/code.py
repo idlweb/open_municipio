@@ -104,12 +104,12 @@ def update_project():
                 urls_file = 'urls_%(environment)s.py' % env        
                 put(urls_file, urls_file, mode=0644)
         fastprint(" done." % env, end='\n')
-        fastprint("Updating WSGI script..." % env, show_prefix=True)
-        with lcd(os.path.join(env.local_repo_root, env.project)):
-            with cd(os.path.join(env.domain_root, 'private')):
-                source = '%(environment)s.wsgi' % env
-                dest = 'django.wsgi'
-                put(source, dest, mode=0644)
+##        fastprint("Updating WSGI script..." % env, show_prefix=True)
+##        with lcd(os.path.join(env.local_repo_root, env.project)):
+##            with cd(os.path.join(env.domain_root, 'private')):
+##                source = '%(environment)s.wsgi' % env
+##                dest = 'django.wsgi'
+##                put(source, dest, mode=0644)
         fastprint(" done." % env, end='\n')
     # trigger code reloading
     touch_WSGI_script()

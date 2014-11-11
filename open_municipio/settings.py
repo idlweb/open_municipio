@@ -19,9 +19,10 @@
 import os
 
 # root directory for application-specific files (on the server machine)
-DOMAIN_ROOT = os.path.abspath(os.path.dirname(os.path.dirname((os.path.dirname(__file__)))))
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__))
 REPO_ROOT = os.path.abspath(os.path.dirname(PROJECT_ROOT))
+DOMAIN_ROOT = os.path.dirname(REPO_ROOT)
+
 VERSION = __version__ = file(os.path.join(PROJECT_ROOT, 'VERSION')).read().strip()
 
 DEBUG = True
