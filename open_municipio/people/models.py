@@ -393,7 +393,7 @@ class InstitutionCharge(Charge):
             if self.responsabilities.count():
                 return "%s" % (self.responsabilities[0].get_charge_type_display())
             else:
-                return _('Member').translate(settings.LANGUAGE_CODE)
+                return self.institution.name #_('Member').translate(settings.LANGUAGE_CODE)
         else:
             return ''
 
