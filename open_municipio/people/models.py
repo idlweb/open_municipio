@@ -386,7 +386,7 @@ class InstitutionCharge(Charge):
                 return " %s" % self.description
         elif self.institution.institution_type == Institution.COUNCIL:
             if self.responsabilities.count():
-                return "%s Consiglio Comunale" % (self.responsabilities[0].get_charge_type_display(),)
+                return "%s Ordine" % (self.responsabilities[0].get_charge_type_display(),)
             else:
                 return _('Counselor')
         elif self.institution.institution_type == Institution.COMMITTEE:
