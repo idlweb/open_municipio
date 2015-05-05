@@ -3,6 +3,7 @@ import logging
 import re
 from django.template.defaultfilters import slugify
 from datetime import datetime
+from django.utils import formats
 from django.core.exceptions import ObjectDoesNotExist
 from south.modelsinspector import add_ignored_fields
 from django.conf import settings
@@ -58,6 +59,9 @@ class Act(NewsTargetMixin, MonitorizedItem, TimeStampedModel):
         ('PRESENTED', 'presented', _('presented')),
         ('APPROVED', 'approved', _('approved')),
         ('REJECTED', 'rejected', _('rejected')),
+        ('RETIRED', 'retired', _('retired')),
+        ('DECAYED', 'decayed', _('decayed')),
+        ('POSTPONED', 'postponed', _('postponed')),
     )
 
     idnum = models.CharField(max_length=64, blank=True, help_text=_("A string representing the identification or sequence number for this act, used internally by the municipality's administration."))
@@ -71,7 +75,7 @@ class Act(NewsTargetMixin, MonitorizedItem, TimeStampedModel):
     emitting_institution = models.ForeignKey(Institution, related_name='emitted_act_set', verbose_name=_('emitting institution'))
     category_set = models.ManyToManyField('taxonomy.Category', verbose_name=_('categories'), blank=True, null=True)
     location_set = models.ManyToManyField('locations.Location', through='locations.TaggedActByLocation', verbose_name=_('locations'), blank=True, null=True)
-    status_is_final = models.BooleanField(default=False)
+    status_is_final = models.BooleanField(_('status is final'), default=False)
     is_key = models.BooleanField(default=False, help_text=_("Specify whether this act should be featured"))
     slug = models.SlugField(max_length=500, blank=True, null=True)
 
@@ -241,6 +245,38 @@ class Act(NewsTargetMixin, MonitorizedItem, TimeStampedModel):
             if groups.has_key(transition.final_status):
                 groups.get(transition.final_status).append(transition)
         return groups
+        
+    def get_first_non_final_transitions(self):
+        """
+        Retrieve the first non final transition
+        """
+        this = self.downcast()
+
+        statuses = []
+        for final_status in this.FINAL_STATUSES: statuses.append(final_status[0])
+
+        # fill groups with ordered transitions
+        for transition in this.transitions.order_by('transition_date'):
+            if not transition.final_status in statuses:
+                return transition
+
+        return None
+        
+    def get_last_final_transitions(self):
+        """
+        Retrieve the first non final transition
+        """
+        this = self.downcast()
+
+        statuses = []
+        for final_status in this.FINAL_STATUSES: statuses.append(final_status[0])
+
+        # fill groups with ordered transitions
+        for transition in this.transitions.order_by('-transition_date'):
+            if transition.final_status in statuses:
+                return transition
+
+        return None
 
     def is_final_status(self, status=None):
         """
@@ -270,7 +306,7 @@ class Act(NewsTargetMixin, MonitorizedItem, TimeStampedModel):
 
         return None
 
-    @models.permalink
+#    @models.permalink
     def get_absolute_url(self):
         """
         Introduce url based on slugs. The self.OM_DETAIL_VIEW_NAME is used by any
@@ -284,22 +320,25 @@ class Act(NewsTargetMixin, MonitorizedItem, TimeStampedModel):
 
         if getattr(dc_act, "OM_DETAIL_VIEW_NAME"):
             if getattr(dc_act, "slug", None):
-                return (dc_act.OM_DETAIL_VIEW_NAME, (), {'slug': self.slug })
+#                return (dc_act.OM_DETAIL_VIEW_NAME, (), {'slug': self.slug })
+                return reverse(dc_act.OM_DETAIL_VIEW_NAME, kwargs={'slug':self.slug})
             else:
-                return (dc_act.OM_DETAIL_VIEW_NAME, (), {'pk': self.pk })
+#                return (dc_act.OM_DETAIL_VIEW_NAME, (), {'pk': self.pk })
+                return reverse(dc_act.OM_DETAIL_VIEW_NAME, kwargs={'pk':self.pk})
         else:
             return dc_act.get_absolute_url()
 
 
-    def get_short_url(self):
-
-        dc_act = self.downcast()
-
-        if getattr(dc_act, "OM_DETAIL_VIEW_NAME"):
-            return reverse(dc_act.OM_DETAIL_VIEW_NAME, args=(self.pk,))
-        else:
-            return dc_act.get_short_url()
-
+## it was only a temporary patch, get rid of it - FS
+##    def get_short_url(self):
+##
+##        dc_act = self.downcast()
+##
+##        if getattr(dc_act, "OM_DETAIL_VIEW_NAME"):
+##            return reverse(dc_act.OM_DETAIL_VIEW_NAME, args=(self.pk,))
+##        else:
+##            return dc_act.get_short_url()
+##
 
     def get_type_name(self):
         """
@@ -375,6 +414,9 @@ class ActSupport(models.Model):
     class Meta:
         db_table = u'acts_act_support'
 
+    def __unicode__(self):
+        return _(u"%(support)s") % { "support": self.support_type }
+
 
 class ActDescriptor(TimeStampedModel):
     """
@@ -401,6 +443,8 @@ class CGDeliberation(Act):
     FINAL_STATUSES = (
         ('APPROVED', _('approved')),
         ('REJECTED', _('rejected')),
+        ('RETIRED', _('retired')),
+        ('DECAYED', _('decayed')),
     )
 
     STATUS = Choices(
@@ -409,6 +453,8 @@ class CGDeliberation(Act):
         ('COUNCIL', 'council', _('council')),
         ('APPROVED', 'approved', _('approved')),
         ('REJECTED', 'rejected', _('rejected')),
+        ('RETIRED', 'retired', _('retired')),
+        ('DECAYED', 'decayed', _('decayed')),
     )
 
     OM_DETAIL_VIEW_NAME="om_cgdeliberation_detail"
@@ -464,6 +510,8 @@ class Deliberation(Act):
     FINAL_STATUSES = (
         ('APPROVED', _('approved')),
         ('REJECTED', _('rejected')),
+        ('RETIRED', _('retired')),
+        ('DECAYED', _('decayed')),
     )
 
     STATUS = Choices(
@@ -472,6 +520,9 @@ class Deliberation(Act):
         ('COUNCIL', 'council', _('council')),
         ('APPROVED', 'approved', _('approved')),
         ('REJECTED', 'rejected', _('rejected')),
+        ('RETIRED', 'retired', _('retired')),
+        ('DECAYED', 'decayed', _('decayed')),
+        ('POSTPONED', 'postponed', _('postponed')),
     )
 
     OM_DETAIL_VIEW_NAME = "om_deliberation_detail"
@@ -522,21 +573,26 @@ class Interrogation(Act):
     FINAL_STATUSES = (
         ('ANSWERED', _('answered')),
         ('NOTANSWERED', _('not answered')),
+        ('RETIRED', _('retired')),
+        ('DECAYED', _('decayed')),
     )
 
     STATUS = Choices(
         ('PRESENTED', 'presented', _('presented')),
         ('ANSWERED', 'answered', _('answered')),
         ('NOTANSWERED', 'notanswered', _('not answered')),
+        ('RETIRED', 'retired', _('retired')),
+        ('DECAYED', 'decayed', _('decayed')),
+        ('POSTPONED', 'postponed', _('postponed')),
     )
     
     OM_DETAIL_VIEW_NAME = "om_interrogation_detail"
     
     status = models.CharField(_('status'), choices=STATUS, max_length=12)
     answer_type = models.CharField(_('answer type'), max_length=8, choices=ANSWER_TYPES)
-    question_motivation = models.TextField(blank=True)
-    answer_text = models.TextField(blank=True)
-    reply_text = models.TextField(blank=True)
+    question_motivation = models.TextField(blank=True, verbose_name=_("question motivation"))
+    answer_text = models.TextField(blank=True, verbose_name=_("answer text"))
+    reply_text = models.TextField(blank=True, verbose_name=_("reply text"))
 
     class Meta:
         verbose_name = _('interrogation')
@@ -600,6 +656,18 @@ class Interrogation(Act):
 
         return act_speeches
 
+    @property
+    def answer_date(self):
+    
+        date = None
+
+        answer_dates = self.transition_set.filter(final_status=Interrogation.STATUS.answered).values("transition_date").order_by("-transition_date")
+
+        if len(answer_dates) > 0:
+            date = answer_dates[0]["transition_date"]
+
+        return date        
+
 
 class Interpellation(Act):
     """
@@ -613,12 +681,17 @@ class Interpellation(Act):
     FINAL_STATUSES = (
         ('ANSWERED', _('answered')),
         ('NOTANSWERED', _('not answered')),
+        ('RETIRED', _('retired')),
+        ('DECAYED', _('decayed')),
     )
 
     STATUS = Choices(
         ('PRESENTED', 'presented', _('presented')),
         ('ANSWERED', 'answered', _('answered')),
         ('NOTANSWERED', 'notanswered', _('not answered')),
+        ('RETIRED', 'retired', _('retired')),
+        ('DECAYED', 'decayed', _('decayed')),
+        ('POSTPONED', 'postponed', _('postponed')),
     )
     
     OM_DETAIL_VIEW_NAME = "om_interpellation_detail"
@@ -693,6 +766,20 @@ class Interpellation(Act):
 
         return act_speeches
 
+    @property
+    def answer_date(self):
+    
+        date = None
+
+        answer_dates = self.transition_set.filter(final_status=Interpellation.STATUS.answered).values("transition_date").order_by("-transition_date")
+
+        if len(answer_dates) > 0:
+            date = answer_dates[0]["transition_date"]
+
+        return date        
+
+
+
 class Motion(Act):
     """
     It is a political act, used to publicly influence members of the City Government, or the Mayor,
@@ -702,6 +789,8 @@ class Motion(Act):
     FINAL_STATUSES = (
         ('APPROVED', _('approved')),
         ('REJECTED', _('rejected')),
+        ('RETIRED', _('retired')),
+        ('DECAYED', _('decayed')),
     )
 
     STATUS = Choices(
@@ -709,6 +798,9 @@ class Motion(Act):
         ('COUNCIL', 'council', _('council')),
         ('APPROVED', 'approved', _('approved')),
         ('REJECTED', 'rejected', _('rejected')),
+        ('RETIRED', 'retired', _('retired')),
+        ('DECAYED', 'decayed', _('decayed')),
+        ('POSTPONED', 'postponed', _('postponed')),
     )
 
     OM_DETAIL_VIEW_NAME = "om_motion_detail"
@@ -736,6 +828,8 @@ class Agenda(Act):
     FINAL_STATUSES = (
         ('APPROVED', _('approved')),
         ('REJECTED', _('rejected')),
+        ('RETIRED',  _('retired')),
+        ('DECAYED', _('decayed')),
     )
 
     STATUS = Choices(
@@ -743,6 +837,9 @@ class Agenda(Act):
         ('COUNCIL', 'council', _('council')),
         ('APPROVED', 'approved', _('approved')),
         ('REJECTED', 'rejected', _('rejected')),
+        ('RETIRED', 'retired', _('retired')),
+        ('DECAYED', 'decayed', _('decayed')),
+        ('POSTPONED', 'postponed', _('postponed')),
     )
 
     OM_DETAIL_VIEW_NAME = "om_agenda_detail"
@@ -770,6 +867,8 @@ class Amendment(Act):
     FINAL_STATUSES = (
         ('APPROVED', _('approved')),
         ('REJECTED', _('rejected')),
+        ('RETIRED', _('retired')),
+        ('DECAYED', _('decayed')),
     )
 
     # TODO: add additional statuses allowed for this act type
@@ -777,6 +876,9 @@ class Amendment(Act):
         ('PRESENTED', 'presented', _('presented')), 
         ('APPROVED', 'approved', _('approved')),
         ('REJECTED', 'rejected', _('rejected')),
+        ('RETIRED', 'retired', _('retired')),
+        ('DECAYED', 'decayed', _('decayed')),
+        ('POSTPONED', 'postponed', _('postponed')),
     )
 
     OM_DETAIL_VIEW_NAME = "om_amendment_detail"
@@ -813,6 +915,9 @@ class Transition(models.Model):
         verbose_name = _('status transition')
         verbose_name_plural = _('status transition')
 
+
+    def __unicode__(self):
+        return _(u"%(status)s on %(date)s") % { "status": self.final_status, "date": formats.date_format(self.transition_date) }
 
 #
 # Documents
@@ -916,9 +1021,10 @@ class Speech(Document):
         else:
             ValueError("In order to get the default slug, the Speech must have an author, a date, a sitting item and a sequential order")
 
-    @models.permalink
+#    @models.permalink
     def get_absolute_url(self):
-        return('om_speech_detail', (), {'slug': str(self.slug)})
+#        return('om_speech_detail', (), {'slug': str(self.slug)})
+        return reverse('om_speech_detail', kwargs={'slug':str(self.slug)})
 
     @property
     def author_name(self):
@@ -1075,33 +1181,47 @@ def new_signature(**kwargs):
 #        if signature.support_date > act.presentation_date:
         if signature_support_date > act_presentation_date:
             created = False
+            news_text = News.get_text_for_news(ctx, 'newscache/act_signed_after_presentation.html')
+            defaults = { "text": news_text }
             news, created = News.objects.get_or_create(
                 generating_object_pk=signature.pk,
                 generating_content_type=ContentType.objects.get_for_model(signature),
                 related_object_pk=act.pk,
                 related_content_type=ContentType.objects.get_for_model(act),
                 priority=3,
-                text=News.get_text_for_news(ctx, 'newscache/act_signed_after_presentation.html')
+                defaults=defaults
             )
             if created:
                 logger.debug("  act was signed after presentation news created")
             else:
-                logger.debug("  act was signed after presentation news found")
+                if news.text != news_text:
+                    news.text = news_text
+                    news.save()
+                    logger.debug("  act was signed after presentation news found and updated")
+                else:
+                    logger.debug("  act was signed after presentation news found")
 
         # generate signature news, for the politician
         created = False
+        news_text=News.get_text_for_news(ctx, 'newscache/person_signed.html')
+        defaults = { "text":news_text }
         news, created = News.objects.get_or_create(
             generating_object_pk=signature.pk,
             generating_content_type=ContentType.objects.get_for_model(signature),
             related_object_pk=signer.pk,
             related_content_type=ContentType.objects.get_for_model(signer),
             priority=2,
-            text=News.get_text_for_news(ctx, 'newscache/person_signed.html')
+            defaults=defaults
         )
         if created:
             logger.debug("  user signed act news created")
         else:
-            logger.debug("  user signed act news found")
+            if news.text != news_text:  
+                news.text = news_text
+                news.save()
+                logger.debug("  user signed act news found and updated")
+            else:
+                logger.debug("  user signed act news found")
 
 
 @receiver(pre_delete, sender=ActSupport)
@@ -1148,33 +1268,49 @@ def new_transition(**kwargs):
         # to shorten acts' presentations, with signatures
         if transition.final_status == 'PRESENTED':
             created = False
+            news_text=News.get_text_for_news(ctx, 'newscache/act_presented.html')
+    
+            defaults = { "text": news_text }
             news, created = News.objects.get_or_create(
                 generating_object_pk=transition.pk,
                 generating_content_type=ContentType.objects.get_for_model(transition),
                 related_object_pk=act.pk,
                 related_content_type=ContentType.objects.get_for_model(act),
                 priority=1,
-                text=News.get_text_for_news(ctx, 'newscache/act_presented.html')
+                defaults=defaults
             )
             if created:
                 logger.debug("  act presentation news created")
             else:
-                logger.debug("  act presentation news found")
+                if news.text != news_text:
+                    news.text = news_text
+                    news.save()
+                    logger.debug("  act presentation news found and updated")
+                else:
+                    logger.debug("  act presentation news found")
 
         else:
             created = False
+            news_text=News.get_text_for_news(ctx, 'newscache/act_changed_status.html')
+            defaults = { "text": news_text }
+
             news, created = News.objects.get_or_create(
                 generating_object_pk=transition.pk,
                 generating_content_type=ContentType.objects.get_for_model(transition),
                 related_object_pk=act.pk,
                 related_content_type=ContentType.objects.get_for_model(act),
                 priority=1,
-                text=News.get_text_for_news(ctx, 'newscache/act_changed_status.html')
+                defaults=defaults
             )
             if created:
                 logger.debug("  act changed status news created")
             else:
-                logger.debug("  act changed status news found")
+                if news.text != news_text:
+                    news.text = news_text
+                    news.save()
+                    logger.debug("  act changed status news found and updated")
+                else:
+                    logger.debug("  act changed status news found")
 
 @receiver(pre_delete, sender=Transition)
 def pre_delete_transition(**kwargs):

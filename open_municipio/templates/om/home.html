@@ -129,6 +129,9 @@
                   Nessun consigliere
                   {% endfor %}
               </ul>
+              <div>
+              <a href="{% url 'om_institution_council' %}">Vai alla classifica completa</a>
+              </div>
           </div>
           <div class="span4">
               <h2>I più monitorati</h2>
@@ -145,9 +148,11 @@
                       </li>
                   {% empty %}
                   Nessun amministratore monitorato
-
                   {% endfor %}
               </ul>
+              <div>
+              <a href="{% url 'om_institution_council' %}">Vai alla classifica completa</a>
+              </div>
           </div>
           <div class="span4">
               <h2>I consiglieri con più atti</h2>
@@ -162,9 +167,11 @@
                       </li>
                   {% empty %}
                   Nessun consigliere
-
                   {% endfor %}
               </ul>
+              <div>
+              <a href="{% url 'om_institution_council' %}">Vai alla classifica completa</a>
+              </div>
           </div>
       </div>
 
@@ -221,7 +228,7 @@
       <div class="modal" id="home-alert">
           <div class="modal-header">
               <button class="close" data-dismiss="modal">×</button>
-              <img src="{{ STATIC_URL }}img/logo-openmunicipio.png" alt="Open municipio">
+              <img src="{% if LOGO_URL %}{{ LOGO_URL }}{% else %}{{ STATIC_URL }}img/logo-openmunicipio.png{% endif %}" alt="Open municipio">
           </div>
           <div class="modal-body">
               <p>{{ ALERT_POPUP|safe }}</p>

@@ -1,12 +1,17 @@
-from datetime import datetime
-
+from datetime import datetime, date
 import logging
+
+from django.shortcuts import get_object_or_404
+
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.db.models import Q, Count
 from django.http import Http404, HttpResponseRedirect, HttpResponse
 from django.views.generic import TemplateView, DetailView, ListView, RedirectView
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils.translation import ugettext_lazy as _
+from django.core.urlresolvers import reverse
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 
 from open_municipio.people.models import Institution, InstitutionCharge, Person, municipality, InstitutionResponsability, Group
 from open_municipio.monitoring.forms import MonitoringForm
@@ -16,7 +21,12 @@ from open_municipio.events.models import Event
 from open_municipio.acts.models import Speech
 from open_municipio.people.models import Sitting, SittingItem
 
+from open_municipio.om_search.forms import RangeFacetedSearchForm
+from open_municipio.om_search.mixins import FacetRangeDateIntervalsMixin
+from open_municipio.om_search.views import ExtendedFacetedSearchView
+
 from django.core import serializers
+from haystack.query import SearchQuerySet
 
 from sorl.thumbnail import get_thumbnail
 
@@ -272,6 +282,25 @@ class PoliticianDetailView(DetailView):
     context_object_name = 'person'
     template_name='people/politician_detail.html'
 
+    def get_charge(self):
+
+        institution_slug = self.kwargs.get("institution_slug", None)
+        year = int(self.kwargs.get("year", "0"))
+        month = int(self.kwargs.get("month", "0"))
+        day = int(self.kwargs.get("day", "0"))
+
+        charge = None
+
+        if institution_slug and year and month and day: 
+            start_date = date(year=year, month=month, day=day)
+            charge = InstitutionCharge.objects.get(person=self.object, institution__slug=institution_slug, start_date=start_date)
+        else:
+            all_charges = self.object.all_institution_charges.order_by("-start_date")
+            if len(all_charges) > 0:
+                charge = all_charges[0]
+
+        return charge
+
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super(PoliticianDetailView, self).get_context_data(**kwargs)
@@ -280,12 +309,24 @@ class PoliticianDetailView(DetailView):
 
         context['resources'] = { }
 
-        for r in self.object.resources.values('resource_type', 'value', 'description'):
+        person = self.object
+
+        context['person'] = person
+
+        charge = self.get_charge()
+
+        context['charge'] = charge
+
+        for r in person.resources.values('resource_type', 'value', 'description'):
             context['resources'].setdefault(r['resource_type'], []).append(
                 {'value': r['value'], 'description': r['description']}
             )
 
-        current_charges = self.object.get_current_institution_charges().exclude(
+
+        past_charges = person.get_past_institution_charges()
+        context['past_charges'] = past_charges
+
+        current_charges = person.get_current_institution_charges().exclude(
             institutionresponsability__charge_type__in=(
                 InstitutionResponsability.CHARGE_TYPES.mayor,
             ),
@@ -293,18 +334,18 @@ class PoliticianDetailView(DetailView):
         )
         context['current_charges'] = current_charges
         context['current_institutions'] = current_charges.values("institution__name").distinct()
-        context['current_committee_charges'] = self.object.get_current_committee_charges()
-        context['is_counselor'] = self.object.is_counselor()
-        context['current_counselor_charge'] = self.object.current_counselor_charge()
+        context['current_committee_charges'] = person.get_current_committee_charges()
+#        context['is_counselor'] = person.is_counselor()
+#        context['current_counselor_charge'] = person.current_counselor_charge()
 
-        context['current_groupcharge'] = self.object.current_groupcharge
+        context['current_groupcharge'] = person.current_groupcharge
 
-        historical_groupcharges = self.object.historical_groupcharges
+        historical_groupcharges = charge.historical_groupcharges #person.historical_groupcharges
         context['historical_groupcharges'] = historical_groupcharges.order_by('start_date') if historical_groupcharges else None
 
-        # Is politician a counselor? If so, we show present/absent
+        # Is the current charge a counselor? If so, we show present/absent
         # graph
-        if context['is_counselor']:
+        if charge and charge.is_counselor:
             # Calculate average present/absent for counselors
             percentage_present = 0
             percentage_absent = 0
@@ -325,7 +366,7 @@ class PoliticianDetailView(DetailView):
                 "%.1f" % (float(percentage_absent) / n_counselors * 100)
 
             # Calculate present/absent for current counselor
-            charge = context['current_counselor_charge']
+#            charge = context['current_counselor_charge']
             charge.percentage_present_votations = charge.percentage_absent_votations = 0.0
 
             if charge.n_present_votations + charge.n_absent_votations > 0:
@@ -342,22 +383,22 @@ class PoliticianDetailView(DetailView):
 
         # Current politician's charge votes for key votations
         # last 10 are passed to template
-        charge = context['current_counselor_charge']
-        if charge:
+#        charge = context['current_counselor_charge']
+        if charge and charge.is_counselor:
             context['current_charge_votes'] = charge.chargevote_set \
                 .filter(votation__is_key=True) \
                 .order_by('-votation__sitting__date')[0:10]
 
         # last 10 presented acts
         presented_acts = Act.objects\
-            .filter(actsupport__charge__pk__in=self.object.current_institution_charges)\
+            .filter(actsupport__charge__pk__in=person.current_institution_charges)\
             .order_by('-presentation_date')
         context['n_presented_acts'] = presented_acts.count()
         context['presented_acts'] = presented_acts[0:10]
 
         # last 5 speeches
         speeches = Speech.objects\
-            .filter(author=self.object)
+            .filter(author=person)
         context['n_speeches'] = speeches.count()
         context['speeches'] = speeches[0:5]
 
@@ -368,12 +409,12 @@ class PoliticianDetailView(DetailView):
                 # add a monitoring form, to context,
                 # to switch monitoring on and off
                 context['monitoring_form'] = MonitoringForm(data = {
-                    'content_type_id': context['person'].content_type_id,
-                    'object_pk': context['person'].id,
+                    'content_type_id': person.content_type_id,
+                    'object_pk': person.id,
                     'user_id': self.request.user.id
                 })
 
-                if context['person'] in self.request.user.get_profile().monitored_objects:
+                if person in self.request.user.get_profile().monitored_objects:
                     context['is_user_monitoring'] = True
         except ObjectDoesNotExist:
             context['is_user_monitoring'] = False
@@ -386,7 +427,7 @@ class PoliticianDetailView(DetailView):
         #
 
         # get the person from the view
-        p = self.object
+        p = person #self.object
         for charge in p.current_institution_charges:
             for act in charge.presented_acts:
                 for topic in act.topics:
@@ -403,7 +444,7 @@ class PoliticianDetailView(DetailView):
         """
         # Obscurated form of the above code :-)
 
-        for topics in [y.topics for x in self.object.get_current_institution_charges() for y in x.presented_act_set.all() ]:
+        for topics in [y.topics for x in person.get_current_institution_charges() for y in x.presented_act_set.all() ]:
             for topic in topics:
                 if topic.category in [t.category for t in context['person_topics']]:
                     if topic.tag in [t.tag for t in context['person_topics']]:
@@ -615,4 +656,109 @@ def show_mayor(request):
     return HttpResponseRedirect( municipality.mayor.as_charge.person.get_absolute_url() )
 
 
+class ChargeSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin):
+    """
 
+    This view allows faceted search and navigation of the comments.
+
+    It extends an extended version of the basic FacetedSearchView,
+    and can be customized
+
+    """
+    __name__ = 'ChargeSearchView'
+
+    FACETS_SORTED = [ 'start_date', 'end_date', 'is_active', 'institution' ]
+
+    FACETS_LABELS = {
+        'is_active': _('Active'),
+        'start_date': _('Start date'),
+        'end_date': _('End date'),
+        'institution': _('Institution')
+    }
+    DATE_INTERVALS_RANGES = { }
+
+    def __init__(self, *args, **kwargs):
+
+        # dynamically compute date ranges for faceted search
+        curr_year = datetime.today().year
+        for curr_year in xrange(settings.OM_START_YEAR, curr_year + 1):
+            date_range = self._build_date_range(curr_year)
+            self.DATE_INTERVALS_RANGES[curr_year] = date_range
+    
+        sqs = SearchQuerySet().filter(django_ct='people.institutioncharge').\
+            facet('is_active').facet('institution')
+
+        for (year, range) in self.DATE_INTERVALS_RANGES.items():
+            sqs = sqs.query_facet('start_date', range['qrange'])
+
+        for (year, range) in self.DATE_INTERVALS_RANGES.items():
+            sqs = sqs.query_facet('end_date', range['qrange'])
+
+        kwargs['searchqueryset'] = sqs.order_by('-start_date').highlight()
+
+        # Needed to switch out the default form class.
+        if kwargs.get('form_class') is None:
+            kwargs['form_class'] = RangeFacetedSearchForm
+
+        super(ChargeSearchView, self).__init__(*args, **kwargs)
+
+    def _build_date_range(self, curr_year):
+        return { 'qrange': '[%s-01-01T00:00:00Z TO %s-12-31T00:00:00Z]' % \
+                (curr_year, curr_year), 'r_label': curr_year }
+
+    def build_page(self):
+        self.results_per_page = int(self.request.GET.get('results_per_page', settings.HAYSTACK_SEARCH_RESULTS_PER_PAGE))
+        return super(ChargeSearchView, self).build_page()
+
+    def build_form(self, form_kwargs=None):
+        if form_kwargs is None:
+            form_kwargs = {}
+
+        # This way the form can always receive a list containing zero or more
+        # facet expressions:
+        #form_kwargs['act_url'] = self.request.GET.get("act_url")
+
+        return super(ChargeSearchView, self).build_form(form_kwargs)
+
+    def _get_extended_selected_facets(self):
+        """
+        modifies the extended_selected_facets, adding correct labels for this view
+        works directly on the extended_selected_facets dictionary
+        """
+        extended_selected_facets = super(ChargeSearchView, self)._get_extended_selected_facets()
+
+        # this comes from the Mixins
+        extended_selected_facets = self.add_date_interval_extended_selected_facets(extended_selected_facets, 'start_date')
+        extended_selected_facets = self.add_date_interval_extended_selected_facets(extended_selected_facets, 'end_date')
+
+        return extended_selected_facets
+
+    def extra_context(self):
+        """
+        Add extra content here, when needed
+        """
+        extra = super(ChargeSearchView, self).extra_context()
+        extra['base_url'] = reverse('charge_search') + '?' + extra['params'].urlencode()
+
+        # get data about custom date range facets
+        extra['facet_queries_start_date'] = self._get_custom_facet_queries_date('start_date')
+        extra['facet_queries_end_date'] = self._get_custom_facet_queries_date('end_date')
+
+        extra['facets_sorted'] = self.FACETS_SORTED
+        extra['facets_labels'] = self.FACETS_LABELS
+
+        paginator = Paginator(self.results, self.results_per_page)
+        page = self.request.GET.get('page', 1)
+        try:
+            page_obj = paginator.page(page)
+        except PageNotAnInteger:
+            # If page is not an integer, deliver first page.
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            # If page is out of range (e.g. 9999), deliver last page of results.
+            page_obj = paginator.page(paginator.num_pages)
+
+        extra['paginator'] = paginator
+        extra['page_obj'] = page_obj
+
+        return extra

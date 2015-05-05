@@ -64,6 +64,20 @@
         </a>
     </td>
 
+    <!-- speeches -->
+    <td class="text-center">
+        <a href="{% url 'om_speech_search' %}?q=&person={{ charge.person.slug }}">
+        {{ charge.person.n_speeches }}
+        </a>
+    </td>
+
+    <!-- received acts -->
+    <td class="text-center">
+        <a href="{% url 'om_act_search' %}?q=&recipient={{ charge.person.slug }}">
+        {{ charge.n_received_acts }}
+        </a>
+    </td>
+
     <!-- monitoring users -->
     <td class="text-center">
         {{ charge.person.all_monitoring_count }}

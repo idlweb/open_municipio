@@ -1,5 +1,6 @@
 {% extends 'base_two_columns.html' %}
 
+{% load cache %}
 {% load om_utils %}
 {% load monitoring_tags %}
 {% load thumbnail %}
@@ -39,11 +40,15 @@
           <th class="span2">Presenze</th>
           <th class="span2">Voti ribelli</th>
           <th class="span2">Atti</th>
+          <th class="span2">Interventi {% popover_info 'interventi-consiglieri' %}</th>
           <th class="span2">Monitorato</th>
       </tr>
       </thead>
       <tbody>
+{% comment %}
       {% if president %}
+{% endcomment %}
+      {% cache 86400 council_members %}
       {%  include 'people/counselor_table_row.html' with charge=president label="Presidente" id_prefix="0" %}
       {% endif %}
       {% if vicepresidents %}
@@ -54,6 +59,7 @@
       {% for charge in council.members %}
           {%  include 'people/counselor_table_row.html' with charge=charge id_prefix="2" %}
       {% endfor %}
+      {% endcache %}
       </tbody>
     </table>
 
@@ -244,11 +250,10 @@
                 bFilter: false,
                 aoColumns: [
                     null,
-                    //null,
                     { sType: "fullname", asSorting: ['desc', 'asc']},
                     { sType: "percentage", asSorting: ['desc', 'asc']},
                     {asSorting: ['desc', 'asc']},
-//                    {asSorting: ['desc', 'asc']},
+                    { sType: "acts", asSorting: ['desc', 'asc']},
                     { sType: "acts", asSorting: ['desc', 'asc']},
                     {asSorting: ['desc', 'asc']}
                 ],

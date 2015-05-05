@@ -1,9 +1,10 @@
 from django.conf import settings
+from django.shortcuts import redirect
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count
-from django.views.generic import DetailView
+from django.views.generic import DetailView, View
 from django.views.generic.list import ListView
 from open_municipio.acts.models import Deliberation, Motion, Interpellation, Amendment, Agenda, Interrogation
 from open_municipio.newscache.models import News
@@ -13,15 +14,10 @@ from open_municipio.people.models import Person, GroupCharge
 from open_municipio.taxonomy.models import Category, Tag
 from open_municipio.users.models import UserProfile
 
-class UserDetailView(DetailView):
+class UserDetailView(View):
 
-    def get_object(self, queryset=None):
-
-        # object lookup using username
-        object = User.objects.get(username=self.kwargs['username'])
-
-        # Return the object
-        return object
+    def dispatch(self, *args, **kwargs):
+        return redirect("profiles_profile_detail", username=kwargs["username"])
 
 class UserProfileDetailView(DetailView):
     model = UserProfile
@@ -83,7 +79,7 @@ class UserProfileListView(ListView):
 
         news = News.objects.filter(news_type=News.NEWS_TYPE.community, priority=1)
         news_community = sorted(news, key=lambda n: n.news_date, 
-                                reverse=True)[0:3]
+                                reverse=True)[0:10]
 
         context.update({
             # TODO if a person not have a institution_charge...?
@@ -118,7 +114,12 @@ def extract_top_monitored_objects(*models, **kwargs):
             annotate(n_monitoring=Count('object_pk')).\
             order_by('-n_monitoring')[:limit]:
         ct = ContentType.objects.get(pk=el['content_type'])
-        object = ct.get_object_for_this_type(pk=el['object_pk'])
+        try:
+            object = ct.get_object_for_this_type(pk=el['object_pk'])
+        except ObjectDoesNotExist, e:
+            # the monitored object has been deleted, probably. ignore this
+            continue
+
         monitored_objects.append({'content_type': ct, 'object': object, 'n_monitoring': el['n_monitoring']})
 
     return monitored_objects

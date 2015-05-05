@@ -31,7 +31,7 @@ class VotationSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin
     __name__ = 'VotationSearchView'
 
     FACETS_SORTED = ['act_type', 'is_key', 'is_secret', 'organ', 'votation_outcome',
-        'n_presents_range', 'n_rebels_range', 'n_variance', 'votation_date']
+        'n_presents_range', 'n_rebels_range', 'n_variance', 'votation_date', 'month']
 
     FACETS_LABELS = {
         'act_type': _('Related act type'),
@@ -42,7 +42,8 @@ class VotationSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin
         'n_presents_range': _('Presents'),
         'n_rebels_range': _('Rebels'),
         'n_variance': _('Votation variance'),
-        'votation_date': _('Votation year')
+        'votation_date': _('Sitting year'),
+        'month': _('Sitting month')
     }
     DATE_INTERVALS_RANGES = { }
 
@@ -57,7 +58,7 @@ class VotationSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin
         sqs = SearchQuerySet().filter(django_ct='votations.votation').\
             facet('act_type').facet('is_key').facet('is_secret').facet('organ').\
             facet('n_presents_range').facet('n_rebels_range').\
-            facet('n_variance').facet('votation_outcome')
+            facet('n_variance').facet('votation_outcome').facet('month')
 
         for (year, range) in self.DATE_INTERVALS_RANGES.items():
             sqs = sqs.query_facet('votation_date', range['qrange'])
@@ -110,9 +111,16 @@ class VotationSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin
         extra['base_url'] = reverse('om_votation_search') + '?' + extra['params'].urlencode()
 
         if self.request.GET.get("act_url"):
-            act_id = int(self.request.GET.get('act_url').split("/")[-2])
+            act_id_or_slug = self.request.GET.get('act_url').split("/")[-2]
+
+            act = None
+            if act_id_or_slug.isdigit():
+                act = Act.objects.get(pk=act_id_or_slug)
+            else:
+                act = Act.objects.get(slug=act_id_or_slug)
+
             extra['act_votations'] = True
-            extra['act'] = Act.objects.get(pk=act_id).downcast()
+            extra['act'] = act.downcast()
 
         person_slug = self.request.GET.get('person', None)
         if person_slug:

@@ -98,6 +98,13 @@ class Person(models.Model, MonitorizedItem):
         """
         return self.institutioncharge_set.select_related().all()
 
+
+    def get_past_institution_charges(self, moment=None):
+        return self.institutioncharge_set.select_related().past(moment=moment).exclude(
+            institution__institution_type__in=(Institution.COMMITTEE, Institution.JOINT_COMMITTEE)
+    )
+    past_institution_charges = property(get_past_institution_charges)
+
     def get_current_institution_charges(self, moment=None):
         """
         Returns the current institution charges at the given moment (no committees).
@@ -105,7 +112,6 @@ class Person(models.Model, MonitorizedItem):
         return self.institutioncharge_set.select_related().current(moment=moment).exclude(
             institution__institution_type__in=(Institution.COMMITTEE, Institution.JOINT_COMMITTEE)
         )
-
     current_institution_charges = property(get_current_institution_charges)
 
     def get_current_committee_charges(self, moment=None):
@@ -116,6 +122,7 @@ class Person(models.Model, MonitorizedItem):
             institution__institution_type__in=(Institution.COMMITTEE, Institution.JOINT_COMMITTEE)
         ).order_by('-institutionresponsability__charge_type','institution__position')
     current_committee_charges = property(get_current_committee_charges)
+
 
     def get_current_charge_in_institution(self, institution, moment=None):
         """
@@ -237,6 +244,20 @@ class Person(models.Model, MonitorizedItem):
             news |= c.related_news
         return news
 
+    @property
+    def speeches(self):
+        """
+        Speeches of a politician
+        """
+        return open_municipio.acts.models.Speech.objects.filter(author=self)
+
+    @property
+    def n_speeches(self):
+        """
+        Number of speeches of a politician
+        """
+        return self.speeches.count()
+
 
 class Resource(models.Model):
     """
@@ -351,6 +372,24 @@ class InstitutionCharge(Charge):
     n_present_attendances = models.IntegerField(default=0, verbose_name=_("number of present attendances"))
     n_absent_attendances = models.IntegerField(default=0, verbose_name=_("number of absent attendances"))
 
+    def get_absolute_url(self):
+
+        url = None
+
+        if self.institution.institution_type == Institution.COMMITTEE:
+            url = self.person.get_absolute_url()
+        else:
+            url = reverse("om_politician_detail", 
+                kwargs={"slug":self.person.slug, 
+                    "institution_slug": self.institution.slug,
+                    "year":self.start_date.year, "month": self.start_date.month, 
+                    "day":self.start_date.day })
+
+        return url
+
+    def is_counselor(self):
+        return self.institution.institution_type == Institution.COUNCIL
+
 
     class Meta(Charge.Meta):
         db_table = u'people_institution_charge'
@@ -437,6 +476,13 @@ class InstitutionCharge(Charge):
         The QuerySet of acts received by this charge.
         """
         return self.received_act_set.all()
+
+    @property
+    def n_received_acts(self):
+        """
+        The QuerySet of acts received by this charge.
+        """
+        return self.received_act_set.count()
 
     @property
     def charge_type(self):

@@ -18,19 +18,21 @@ class ActIndex(indexes.SearchIndex, indexes.Indexable):
     is_proposal = indexes.FacetCharField()
     organ = indexes.FacetCharField(model_attr='emitting_institution__lowername')
     pub_date = indexes.FacetDateField()
+    final_date = indexes.DateField()
     person = indexes.MultiValueField(indexed=True, stored=False)
+    recipient = indexes.MultiValueField(indexed=True, stored=False)
     tags_with_urls = indexes.MultiValueField(indexed=True, stored=True)
     categories_with_urls = indexes.MultiValueField(indexed=True, stored=True)
     locations_with_urls = indexes.MultiValueField(indexed=True, stored=True)
     has_locations = indexes.FacetCharField()
     idnum = indexes.CharField(indexed=True, stored=False, model_attr='idnum')
     month = indexes.FacetCharField()
+    status = indexes.FacetCharField()
 
     # stored fields, used not to touch DB
     # while showing results
     url = indexes.CharField(indexed=False, stored=True)
     title = indexes.CharField(indexed=False, stored=True)
-
 
     logger = logging.getLogger('import')
 
@@ -103,12 +105,23 @@ class ActIndex(indexes.SearchIndex, indexes.Indexable):
         Return approval_date or presentation_date as pub_date field,
         according to the status of
         """
-        ret_date = obj.presentation_date
-        activate(settings.LANGUAGE_CODE)
-        if obj.downcast().status == 'APPROVED' and unicode(obj.get_type_name()) == u'delibera' and obj.downcast().approval_date:
-            ret_date = obj.downcast().approval_date
+        transition = obj.get_first_non_final_transitions()
 
-        return ret_date
+        return transition.transition_date if transition else obj.presentation_date
+
+
+    def prepare_final_date(self, obj):
+        """
+        WRITEME
+        """
+        transition = obj.get_last_final_transitions()
+
+        if (transition):
+            return transition.transition_date
+
+        this = obj.downcast()
+
+        return this.approval_date if hasattr(this, 'approval_date') else obj.presentation_date
 
 
     def prepare_person(self, obj):
@@ -117,11 +130,19 @@ class ActIndex(indexes.SearchIndex, indexes.Indexable):
                 list(obj.co_signers.values('person__slug').distinct())]
 
 
+    def prepare_recipient(self, obj):
+        return [p['person__slug'] for p in
+                list(obj.recipients.values('person__slug').distinct())]
+
+
     def prepare_url(self, obj):
         return obj.downcast().get_absolute_url() if obj.downcast() else None
 
     def prepare_month(self, obj):
         return obj.presentation_date.strftime("%B")
+
+    def prepare_status(self, obj):
+        return obj.downcast().get_status_display()
 
 
 class SpeechIndex(indexes.SearchIndex, indexes.Indexable):
@@ -133,6 +154,7 @@ class SpeechIndex(indexes.SearchIndex, indexes.Indexable):
     person = indexes.MultiValueField(indexed=True, stored=False)
 
     act_url = indexes.MultiValueField(indexed=True, stored=True)
+    month = indexes.FacetCharField()
 
     def get_model(self):
         return Speech
@@ -154,7 +176,15 @@ class SpeechIndex(indexes.SearchIndex, indexes.Indexable):
     def prepare_date(self, obj):
         return obj.date
 
+    def prepare_month(self, obj):
+        return obj.sitting.date.strftime("%B")
+
     def prepare_act_url(self, obj):
-        return [act.get_short_url() for act in obj.ref_acts]
+#        return [act.get_short_url() for act in obj.ref_acts]
+        res = [act.get_absolute_url() for act in obj.ref_acts]
+#        print "prepare act url for speech: %s" % res
+
+        return res
+
 
 locale.setlocale(locale.LC_ALL, '')

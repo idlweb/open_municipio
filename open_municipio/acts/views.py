@@ -46,7 +46,7 @@ class ActSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin):
     """
     __name__ = 'ActSearchView'
 
-    FACETS_SORTED = ['act_type', 'is_key', 'is_proposal', 'initiative', 'organ', 'pub_date', 'has_locations', 'month']
+    FACETS_SORTED = ['act_type', 'is_key', 'is_proposal', 'initiative', 'organ', 'pub_date', 'has_locations', 'month', 'status']
     FACETS_LABELS = {
         'act_type': _('Act type'),
         'is_key': _('Is key act'),
@@ -54,7 +54,8 @@ class ActSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin):
         'initiative': _('Initiative'),
         'organ': _('Organ'),
         'pub_date': _('Pubblication year'),
-        'month': _('Pubblication month')
+        'month': _('Pubblication month'),
+        'status': _('Status')
     }
     DATE_INTERVALS_RANGES = { }
 
@@ -68,7 +69,7 @@ class ActSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin):
     
         sqs = SearchQuerySet().filter(django_ct='acts.act').\
             facet('act_type').facet('is_key').facet('is_proposal').\
-            facet('initiative').facet('organ').facet('month')
+            facet('initiative').facet('organ').facet('month').facet('status')
 
         for (year, range) in self.DATE_INTERVALS_RANGES.items():
             sqs = sqs.query_facet('pub_date', range['qrange'])
@@ -129,16 +130,25 @@ class ActSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin):
                 extra['category'] = Category.objects.get(slug=category_slug)
             except ObjectDoesNotExist:
                 pass
+
         tag_slug = self.request.GET.get('tag', None)
         if tag_slug:
             try:
                 extra['tag'] = Tag.objects.get(slug=tag_slug)
             except ObjectDoesNotExist:
                 pass
+
         location_slug = self.request.GET.get('location', None)
         if location_slug:
             try:
                 extra['location'] = Location.objects.get(slug=location_slug)
+            except ObjectDoesNotExist:
+                pass
+
+        recipient_slug = self.request.GET.get('recipient', None)
+        if recipient_slug:
+            try:
+                extra['recipient'] = Person.objects.get(slug=recipient_slug)
             except ObjectDoesNotExist:
                 pass
 
@@ -525,9 +535,10 @@ class SpeechSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin):
     """
     __name__ = 'SpeechSearchView'
 
-    FACETS_SORTED = [ 'date', ]
+    FACETS_SORTED = [ 'date', 'month' ]
     FACETS_LABELS = { 
         'date': _('Year'),
+        'month': _('Month')
     }
 
     DATE_INTERVALS_RANGES = { } 
@@ -540,7 +551,7 @@ class SpeechSearchView(ExtendedFacetedSearchView, FacetRangeDateIntervalsMixin):
             date_range = self._build_date_range(curr_year)
             self.DATE_INTERVALS_RANGES[curr_year] = date_range
     
-        sqs = SearchQuerySet().filter(django_ct='acts.speech')
+        sqs = SearchQuerySet().filter(django_ct='acts.speech').facet('month')
 
         for (year, range) in self.DATE_INTERVALS_RANGES.items():
             sqs = sqs.query_facet('date', range['qrange'])
