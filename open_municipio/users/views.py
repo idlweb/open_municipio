@@ -117,7 +117,7 @@ def extract_top_monitored_objects(*models, **kwargs):
         try:
             object = ct.get_object_for_this_type(pk=el['object_pk'])
         except ObjectDoesNotExist, e:
-            # the monitored object has been deleted, probably. ignore this
+            # probably a monitored object has been deleted. skip it
             continue
 
         monitored_objects.append({'content_type': ct, 'object': object, 'n_monitoring': el['n_monitoring']})
